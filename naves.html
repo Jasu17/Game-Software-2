@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Space Invaders – Javascript &amp; HTML5</title>
+    <link rel="stylesheet" href="css/reset.css" />
+    <link rel="stylesheet" href="css/main.css" />
+
+    <!--
+        Orden de carga de módulos JS (importa el orden):
+        1. utils.js   – helpers globales
+        2. config.js  – constantes y GameState
+        3. entities.js – entidades del juego
+        4. renderer.js – renderizado
+        5. scores.js   – puntuaciones
+        6. game.js     – loop y lógica principal
+    -->
+    <script src="js/utils.js"    defer></script>
+    <script src="js/config.js"   defer></script>
+    <script src="js/sounds.js"   defer></script>
+    <script src="js/entities.js" defer></script>
+    <script src="js/renderer.js" defer></script>
+    <script src="js/scores.js"   defer></script>
+    <script src="js/game.js"     defer></script>
+</head>
+
+<body onload="game.init()">
+
+    <div class="contenedor">
+
+        <!-- ── Panel izquierdo ──────────────────────────────────────── -->
+        <div class="panel panel--izquierda">
+            <img src="images/autentia.png" class="logo" alt="Autentia" />
+
+            <ul class="lista">
+                <li class="lista__titulo">CONTROLES:</li>
+                <li class="lista__item lista__item--izquierda">Mover izquierda</li>
+                <li class="lista__item lista__item--derecha">Mover derecha</li>
+                <li class="lista__item lista__item--espacio">Disparar</li>
+            </ul>
+
+            <ul class="lista">
+                <li class="lista__titulo">PROBADO CON:</li>
+                <li class="lista__item lista__item--firefox">Mozilla Firefox</li>
+                <li class="lista__item lista__item--chrome">Google Chrome</li>
+                <li class="lista__item lista__item--safari">Safari</li>
+            </ul>
+        </div>
+
+        <!-- ── Panel de juego (canvas) ──────────────────────────────── -->
+        <div class="panel panel--juego">
+
+            <!-- RP 006: botón de pausa / jugar -->
+            <button id="btn-pause" class="btn-pause">▶ Jugar</button>
+            <!-- RP 009: título del juego visible en la interfaz principal -->
+            <span class="game-title-label">SPACE INVADERS</span>
+
+            <div class="canvas-wrapper">
+                <canvas id="canvas" width="600" height="650">
+                    Tu navegador no soporta HTML5.
+                </canvas>
+
+                <!-- RP 001 / RP 026 / RP 017: overlay con botones al terminar -->
+                <div id="end-overlay" class="end-overlay"></div>
+            </div>
+
+        </div>
+
+        <!-- ── Panel derecho: puntuaciones ──────────────────────────── -->
+        <div class="panel panel--derecha">
+            <h3 class="puntuaciones__titulo">MEJORES PUNTUACIONES</h3>
+            <ul id="puntuaciones" class="puntuaciones__lista"></ul>
+        </div>
+
+    </div>
+
+</body>
+</html>
