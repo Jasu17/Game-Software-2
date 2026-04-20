@@ -52,7 +52,7 @@ consultar las instrucciones en `js/sounds.js`.
 
 ## Tecnologías
 
-- JavaScript ES5 (vanilla)
-- HTML5 Canvas API
-- Web Audio API
-- localStorage
+- JavaScript (arquitectura modular basada en patrones clásicos)
+- HTML5 Canvas (render loop manual)
+- Web Audio API (síntesis procedural de sonido)
+- localStorage (persistencia de ranking)
