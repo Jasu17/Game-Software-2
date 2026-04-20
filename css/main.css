@@ -1,0 +1,245 @@
+/* ============================================================
+   main.css – Estilos principales del juego
+   RP 007: contraste adecuado texto/fondo
+   RP 008: tipografía consistente
+   RP 009: título del juego visible en interfaz principal
+   ============================================================ */
+
+/* ── Variables de color ──────────────────────────────────── */
+:root {
+    --color-bg        : #0d0d1a;
+    --color-panel-bg  : #12122a;
+    --color-accent    : #e94560;
+    --color-text      : #f0f0f0;       /* RP 007: texto claro sobre fondo oscuro */
+    --color-text-muted: #9090a8;
+    --color-link      : #4fc3f7;
+    --color-gold      : #FFD700;
+    --font-main       : 'Arial', sans-serif;  /* RP 008: fuente única y consistente */
+}
+
+/* ── Base ─────────────────────────────────────────────────── */
+body {
+    background : var(--color-bg);
+    color      : var(--color-text);
+    font       : 14px/1.5 var(--font-main);  /* RP 008: line-height consistente */
+    text-align : center;
+}
+
+a {
+    color           : var(--color-link);
+    text-decoration : none;
+}
+a:hover { color: var(--color-accent); }
+
+/* ── Layout principal ─────────────────────────────────────── */
+.contenedor {
+    display        : flex;
+    justify-content: center;
+    align-items    : flex-start;
+    gap            : 20px;
+    max-width      : 1200px;
+    margin         : 20px auto;
+    padding        : 0 10px;
+}
+
+/* ── Paneles laterales ────────────────────────────────────── */
+.panel {
+    background   : var(--color-panel-bg);
+    border-radius: 8px;
+    padding      : 16px;
+    border       : 1px solid rgba(233, 69, 96, 0.15);  /* RP 007: borde sutil */
+}
+
+.panel--izquierda,
+.panel--derecha {
+    width    : 220px;
+    min-width: 180px;
+    text-align: left;
+}
+
+.panel--juego {
+    display        : flex;
+    flex-direction : column;
+    align-items    : center;
+    gap            : 8px;
+    background     : transparent;
+    padding        : 0;
+    border         : none;
+}
+
+/* ── Logo ─────────────────────────────────────────────────── */
+.logo {
+    width        : 100%;
+    max-width    : 200px;
+    height       : auto;
+    margin-bottom: 10px;
+}
+
+/* ── Canvas y su contenedor ───────────────────────────────── */
+.canvas-wrapper {
+    position: relative;
+    display : inline-block;
+}
+
+#canvas {
+    display   : block;
+    box-shadow: 0 0 32px rgba(233, 69, 96, 0.55);
+    cursor    : default;
+}
+
+/* ── RP 009: Título del juego bajo el botón ───────────────── */
+.game-title-label {
+    display    : block;
+    font       : bold 11px var(--font-main);  /* RP 008 */
+    color      : var(--color-text-muted);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-top : -4px;
+}
+
+/* ── Botón de pausa / jugar (RP 006, RP 008) ──────────────── */
+.btn-pause {
+    display      : block;
+    width        : 160px;
+    padding      : 9px 0;
+    font         : bold 15px var(--font-main);  /* RP 008: misma fuente */
+    cursor       : pointer;
+    background   : var(--color-panel-bg);
+    color        : var(--color-text);           /* RP 007: contraste alto */
+    border       : 2px solid var(--color-accent);
+    border-radius: 6px;
+    transition   : background 0.2s, color 0.2s;
+    letter-spacing: 0.5px;
+}
+.btn-pause:hover {
+    background: var(--color-accent);
+    color     : #fff;
+}
+
+/* ── Overlay de fin de juego (RP 001 / RP 026 / RP 017) ───── */
+.end-overlay {
+    display       : none;
+    position      : absolute;
+    bottom        : 60px;
+    left          : 50%;
+    transform     : translateX(-50%);
+    flex-direction: column;
+    align-items   : center;
+    gap           : 10px;
+    z-index       : 10;
+}
+
+.overlay-btn {
+    width        : 200px;
+    padding      : 11px 0;
+    font         : bold 15px var(--font-main);  /* RP 008 */
+    cursor       : pointer;
+    background   : var(--color-panel-bg);
+    color        : var(--color-text);           /* RP 007 */
+    border       : 2px solid var(--color-accent);
+    border-radius: 8px;
+    transition   : background 0.2s, color 0.2s;
+    letter-spacing: 0.3px;
+}
+.overlay-btn:hover {
+    background: var(--color-accent);
+    color     : #fff;
+}
+
+/* Variante secundaria (Menú principal) — menos énfasis */
+.overlay-btn--secondary {
+    border-color: #666;
+    color       : var(--color-text-muted);
+}
+.overlay-btn--secondary:hover {
+    background  : #333;
+    border-color: #aaa;
+    color       : #fff;
+}
+
+/* ── Lista de controles / navegadores ────────────────────── */
+.lista {
+    margin    : 20px 0;
+    padding   : 0;
+    list-style: none;
+}
+
+.lista__titulo {
+    font         : bold 13px var(--font-main);  /* RP 008 */
+    color        : var(--color-gold);
+    border-bottom: 1px solid var(--color-text-muted);
+    padding-bottom: 4px;
+    margin-bottom : 6px;
+    letter-spacing: 1px;
+}
+
+.lista__item {
+    padding    : 6px 0 6px 36px;
+    line-height: 1.6;
+    font-size  : 13px;           /* RP 008: tamaño uniforme */
+    color      : var(--color-text);  /* RP 007: buen contraste */
+    background-repeat  : no-repeat;
+    background-position: left center;
+    background-size    : 28px auto;
+}
+
+.lista__item--izquierda { background-image: url('../images/izquierda.png'); }
+.lista__item--derecha   { background-image: url('../images/derecha.png');   }
+.lista__item--espacio   { background-image: url('../images/space.gif');     }
+.lista__item--firefox   { background-image: url('../images/firefox.png');   }
+.lista__item--chrome    { background-image: url('../images/chrome.png');    }
+.lista__item--safari    { background-image: url('../images/safari.png');    }
+
+/* ── Puntuaciones ─────────────────────────────────────────── */
+.puntuaciones__titulo {
+    font-size    : 13px;
+    font-weight  : bold;
+    font-family  : var(--font-main);   /* RP 008 */
+    color        : var(--color-gold);
+    padding      : 8px 8px 8px 36px;
+    background   : url('../images/medalla.png') no-repeat left center;
+    background-size: 28px auto;
+    margin-bottom: 10px;
+    letter-spacing: 1px;
+}
+
+.puntuaciones__lista {
+    list-style: none;
+    margin    : 0;
+    padding   : 0;
+    width     : 100%;
+}
+
+.puntuaciones__lista li {
+    display     : inline-block;
+    width       : 50%;
+    padding     : 6px 4px;
+    line-height : 1.4;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    font        : 12px var(--font-main);  /* RP 008 */
+    color       : var(--color-text-muted);
+    word-break  : break-all;
+}
+
+/* Primera entrada destacada (RP 007: contraste máximo) */
+.negrita {
+    font-weight: bold;
+    color      : var(--color-text);
+}
+
+/* RP 025: high score con corona */
+.high-score {
+    color : var(--color-gold);
+}
+
+/* RP 010: nombre del jugador en la lista */
+.score-name {
+    font-weight: bold;
+    color      : var(--color-text);
+    font-size  : 12px;
+}
+
+.puntuaciones__lista small {
+    font-size : 10px;
+    color     : var(--color-text-muted);
+}
