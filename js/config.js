@@ -51,8 +51,8 @@ var CONFIG = {
             label       : 'Nivel 1',
             bonusPoints : 20,
             waves       : [
-                ['normal'],
-                ['normal']
+                ['normal', 'normal'],
+                ['normal', 'normal', 'normal']
             ]
         },
         {
@@ -60,7 +60,8 @@ var CONFIG = {
             label       : 'Nivel 2',
             bonusPoints : 35,
             waves       : [
-                ['normal', 'fast']
+                ['normal', 'normal', 'fast'],
+                ['normal', 'zigzag', 'normal']
             ]
         },
         {
@@ -68,7 +69,8 @@ var CONFIG = {
             label       : 'Nivel 3',
             bonusPoints : 50,
             waves       : [
-                ['fast', 'zigzag']
+                ['zigzag', 'normal', 'fast'],
+                ['zigzag', 'zigzag', 'normal', 'normal']
             ]
         },
         {
@@ -76,7 +78,8 @@ var CONFIG = {
             label       : 'Nivel 4',
             bonusPoints : 70,
             waves       : [
-                ['zigzag', 'zigzag']
+                ['zigzag', 'zigzag', 'fast', 'normal'],
+                ['zigzag', 'normal', 'zigzag', 'zigzag']
             ]
         },
         {
