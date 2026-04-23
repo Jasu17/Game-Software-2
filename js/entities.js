@@ -58,10 +58,14 @@ PlayerShot.prototype.constructor = PlayerShot;
 
 /**
  * Proyectil del enemigo: baja en pantalla.
- * Incluye detección de colisión con el jugador.
+ * Si vxOverride/vyOverride están definidos se mueve en esa dirección (abanico del jefe).
  */
 function EvilShot(x, y) {
     Shot.call(this, x, y, GameState.evilShotsBuffer, GameState.images.evilShot);
+
+    /* Vectores de dirección para disparos en abanico (opcionales) */
+    this.vxOverride = null;
+    this.vyOverride = null;
 
     this.isHittingPlayer = function () {
         var p = GameState.player;
@@ -116,9 +120,9 @@ function Enemy(life, shots, enemyImages) {
     /* ── Muerte ── */
     this.kill = function () {
         this.dead = true;
-        GameState.totalEvils--;
         this.image = enemyImages.killed;
-        verifyToCreateNewEvil();
+        /* La lógica de progresión la gestiona buildEnemy() en game.js
+           sobreescribiendo este método con onEnemyRemoved() */
     };
 
     /* ── Movimiento horizontal base (puede ser sobreescrito) ── */
@@ -132,9 +136,31 @@ function Enemy(life, shots, enemyImages) {
         }
     };
 
+    /* goDownSpeed: positivo = baja, negativo = sube (rebote) */
+    this.bouncing      = false;  /* las subclases que rebotan lo ponen en true */
+    this.bounceMinY    = 40;     /* límite superior de rebote */
+    this.bounceMaxY    = 0;      /* límite inferior — se calcula al primer update */
+
     /* ── Actualización por frame ── */
     this.update = function () {
-        this.posY += this.goDownSpeed;
+        /* Calcular límite inferior la primera vez que se conoce el canvas */
+        if (this.bounceMaxY === 0) {
+            this.bounceMaxY = GameState.canvas.height * 0.55;
+        }
+
+        if (this.bouncing) {
+            this.posY += this.goDownSpeed;
+            /* Rebotar al llegar a los límites */
+            if (this.posY <= this.bounceMinY) {
+                this.goDownSpeed = Math.abs(this.goDownSpeed);   /* forzar bajada */
+            } else if (this.posY >= this.bounceMaxY) {
+                this.goDownSpeed = -Math.abs(this.goDownSpeed);  /* forzar subida */
+            }
+        } else {
+            /* Comportamiento original: baja continuamente */
+            this.posY += this.goDownSpeed;
+        }
+
         this.moveHorizontal();
 
         /* Animación de sprites (ciclo de 8 frames) */
@@ -147,29 +173,37 @@ function Enemy(life, shots, enemyImages) {
     };
 
     this.isOutOfScreen = function () {
+        /* Solo los no-rebotantes pueden salir de pantalla */
+        if (this.bouncing) return false;
         return this.posY > (GameState.canvas.height + 15);
     };
 
     /* ── Sistema de disparos del enemigo ── */
     var self = this;
     function shootEnemy() {
-        var e = GameState.evil;
-        if (e && e.shots > 0 && !e.dead) {
-            var disparo = new EvilShot(
-                e.posX + (e.image.width / 2) - 5,
-                e.posY + e.image.height
-            );
-            disparo.add();
-            e.shots--;
-            gameSetTimeout(shootEnemy, getRandomNumber(3000));
+        /* Usar referencia directa al enemigo (self), no GameState.evil,
+           para soportar múltiples enemigos simultáneos en pantalla. */
+        if (self.shots > 0 && !self.dead) {
+            self.firePattern();   /* cada subclase puede sobreescribir firePattern */
+            self.shots--;
+            gameSetTimeout(shootEnemy, 800 + getRandomNumber(2200));
         }
     }
     gameSetTimeout(shootEnemy, 1000 + getRandomNumber(2500));
+
+    /* Patrón de disparo base: un proyectil recto hacia abajo */
+    this.firePattern = function () {
+        var disparo = new EvilShot(
+            self.posX + (self.image.width / 2) - 5,
+            self.posY + self.image.height
+        );
+        disparo.add();
+    };
 }
 
 
 /**
- * Enemigo estándar: movimiento lateral.
+ * Enemigo estándar: movimiento lateral + rebote arriba-abajo.
  * RP 020 – Tipo 1
  */
 function Evil(life, shots) {
@@ -178,8 +212,9 @@ function Evil(life, shots) {
         killed    : GameState.images.evilKilled
     });
     this.goDownSpeed  = CONFIG.EVIL_SPEED * GameState.difficultyMultiplier;
-    this.pointsToKill = 5 + GameState.evilCounter;
+    this.pointsToKill = 5 + GameState.currentLevelIndex;
     this.type         = 'normal';
+    this.bouncing     = true;   /* rebota arriba-abajo, no sale de pantalla */
 }
 Evil.prototype = Object.create(Enemy.prototype);
 Evil.prototype.constructor = Evil;
@@ -196,7 +231,7 @@ function EvilFast(life, shots) {
         killed    : GameState.images.evilKilled
     });
     this.goDownSpeed  = (CONFIG.EVIL_SPEED + 0.8) * GameState.difficultyMultiplier;
-    this.pointsToKill = 8 + GameState.evilCounter;
+    this.pointsToKill = 8 + GameState.currentLevelIndex;
     this.type         = 'fast';
 
     /* Sin movimiento lateral */
@@ -216,16 +251,16 @@ function EvilZigzag(life, shots) {
         killed    : GameState.images.evilKilled
     });
     this.goDownSpeed     = CONFIG.EVIL_SPEED * GameState.difficultyMultiplier;
-    this.pointsToKill    = 10 + GameState.evilCounter;
+    this.pointsToKill    = 10 + GameState.currentLevelIndex;
     this.type            = 'zigzag';
+    this.bouncing        = true;   /* rebota arriba-abajo, no sale de pantalla */
     this.zigzagTimer     = 0;
-    this.zigzagAmplitude = 3 + GameState.evilCounter;
+    this.zigzagAmplitude = 3 + GameState.currentLevelIndex;
 
     this.moveHorizontal = function () {
         var canvas = GameState.canvas;
         this.zigzagTimer += 0.15;
         this.posX += Math.sin(this.zigzagTimer) * this.zigzagAmplitude;
-        /* Mantener dentro del canvas */
         if (this.posX < 5) this.posX = 5;
         if (this.posX > canvas.width - this.image.width - 5)
             this.posX = canvas.width - this.image.width - 5;
@@ -311,6 +346,44 @@ function FinalBoss() {
             }
         }
     };
+    /**
+     * Patrón de disparo del jefe:
+     *  - Fase 1: abanico de 3 proyectiles
+     *  - Fase 2: abanico de 5 proyectiles + 2 dirigidos al jugador
+     */
+    var bossRef = this;
+    this.firePattern = function () {
+        var cx  = bossRef.posX + bossRef.image.width / 2;
+        var cy  = bossRef.posY + bossRef.image.height;
+        var angles, i, angle, vx, vy, shot;
+
+        if (bossRef.phase === 1) {
+            /* Abanico de 3: centro, izquierda y derecha */
+            angles = [-0.35, 0, 0.35];
+        } else {
+            /* Abanico de 5 + 2 dirigidos al jugador */
+            angles = [-0.6, -0.3, 0, 0.3, 0.6];
+            /* Disparos dirigidos */
+            var p  = GameState.player;
+            var dx = (p.posX + p.width  / 2) - cx;
+            var dy = (p.posY + p.height / 2) - cy;
+            var dist = Math.sqrt(dx * dx + dy * dy) || 1;
+            for (i = 0; i < 2; i++) {
+                shot = new EvilShot(cx - 5, cy);
+                shot.vxOverride = (dx / dist) * CONFIG.SHOT_SPEED * (0.9 + i * 0.2);
+                shot.vyOverride = (dy / dist) * CONFIG.SHOT_SPEED * (0.9 + i * 0.2);
+                shot.add();
+            }
+        }
+
+        for (i = 0; i < angles.length; i++) {
+            angle = Math.PI / 2 + angles[i];   /* base: recto hacia abajo */
+            shot  = new EvilShot(cx - 5, cy);
+            shot.vxOverride = Math.cos(angle) * CONFIG.SHOT_SPEED;
+            shot.vyOverride = Math.sin(angle) * CONFIG.SHOT_SPEED;
+            shot.add();
+        }
+    };
 }
 FinalBoss.prototype = Object.create(Enemy.prototype);
 FinalBoss.prototype.constructor = FinalBoss;
@@ -369,18 +442,19 @@ function Player(life, score) {
 
     /* ── Recibir daño / morir ── */
     p.killPlayer = function () {
+        if (this.dead) return;   /* evitar llamadas múltiples en el mismo frame */
         if (this.life > 0) {
             this.dead = true;
-            Sounds.playerDeath();   /* RP 015: sonido al perder vida */
+            Sounds.playerDeath();
             GameState.evilShotsBuffer.splice(0, GameState.evilShotsBuffer.length);
             GameState.playerShotsBuffer.splice(0, GameState.playerShotsBuffer.length);
             this.src = GameState.images.playerKilled.src;
-            createNewEvil();
+            /* Ya no llamar createNewEvil() — el sistema de oleadas lo gestiona */
             gameSetTimeout(function () {
                 GameState.player = new Player(GameState.player.life - 1, GameState.player.score);
             }, 500);
         } else {
-            Sounds.gameOver();      /* RP 015: sonido de game over */
+            Sounds.gameOver();
             Scores.saveFinalScore();
             GameState.youLoose = true;
         }
