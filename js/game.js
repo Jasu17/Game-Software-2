@@ -94,25 +94,11 @@ var game = (function () {
     function update() {
         Renderer.drawBackground();
 
-        /* RP 022: pantalla de inicio */
-        if (GameState.showingStartScreen) {
-            Renderer.drawStartScreen();
-            return;
-        }
+        if (GameState.showingStartScreen)  { Renderer.drawStartScreen();   return; }
+        if (GameState.showingOptions)      { Renderer.drawOptionsMenu();   return; }
+        if (GameState.showingInstructions) { Renderer.drawInstructions();  return; }
+        if (GameState.showingLevelScreen)  { Renderer.drawLevelScreen();   return; }
 
-        /* RP 024: menú de opciones */
-        if (GameState.showingOptions) {
-            Renderer.drawOptionsMenu();
-            return;
-        }
-
-        /* RP 027: pantalla de instrucciones */
-        if (GameState.showingInstructions) {
-            Renderer.drawInstructions();
-            return;
-        }
-
-        /* Pantallas de fin de juego */
         if (GameState.congratulations) {
             Renderer.drawCongratulations();
             if (!GameState.endOverlayShown) {
@@ -121,7 +107,6 @@ var game = (function () {
             }
             return;
         }
-
         if (GameState.youLoose) {
             Renderer.drawGameOver();
             if (!GameState.endOverlayShown) {
@@ -133,23 +118,33 @@ var game = (function () {
 
         /* ── Juego activo ── */
         Renderer.drawPlayer();
-        Renderer.drawEvil();
-        Renderer.drawEvilHealthBar();
-        Renderer.drawImpactParticles();  /* RP 004 */
+        Renderer.drawImpactParticles();
 
-        updateEvil();
+        /* Dibujar y actualizar todos los enemigos activos */
+        var gs = GameState;
+        for (var k = 0; k < gs.activeEnemies.length; k++) {
+            gs.evil = gs.activeEnemies[k];   /* apuntar evil al enemigo actual */
+            Renderer.drawEvil();
+            Renderer.drawEvilHealthBar();
+            updateEvil(gs.activeEnemies[k]);
+        }
+
         updatePlayerShots();
 
-        if (isEvilHittingPlayer()) {
-            GameState.player.killPlayer();
+        /* Colisiones con jugador (cuerpo + disparos) */
+        var hit = false;
+        for (var m = 0; m < gs.activeEnemies.length; m++) {
+            if (isEvilHittingPlayer(gs.activeEnemies[m])) { hit = true; break; }
+        }
+        if (hit) {
+            gs.player.killPlayer();
         } else {
             updateEvilShots();
         }
 
         Renderer.drawRewardMessage();
         Renderer.drawHUD();
-
-        GameState.player.doAnything();
+        gs.player.doAnything();
     }
 
     /* ══════════════════════════════════════════════════════════
@@ -163,13 +158,20 @@ var game = (function () {
             if (!shot) continue;
             shot.identifier = j;
 
-            if (checkCollision(shot)) {
-                if (shot.posY > 0) {
-                    shot.posY -= shot.speed;
-                    GameState.bufferctx.drawImage(shot.image, shot.posX, shot.posY);
-                } else {
-                    shot.deleteShot(j);
+            var hit = false;
+            for (var k = 0; k < GameState.activeEnemies.length; k++) {
+                if (checkCollision(shot, GameState.activeEnemies[k])) {
+                    hit = true;
+                    break;
                 }
+            }
+            if (hit) continue;   /* disparo eliminado por colisión */
+
+            if (shot.posY > 0) {
+                shot.posY -= shot.speed;
+                GameState.bufferctx.drawImage(shot.image, shot.posX, shot.posY);
+            } else {
+                shot.deleteShot(j);
             }
         }
     }
@@ -182,11 +184,19 @@ var game = (function () {
             shot.identifier = i;
 
             if (!shot.isHittingPlayer()) {
-                if (shot.posY <= GameState.canvas.height) {
-                    shot.posY += shot.speed;
-                    GameState.bufferctx.drawImage(shot.image, shot.posX, shot.posY);
+                /* Mover con vector propio (abanico) o dirección estándar */
+                if (shot.vxOverride !== null) {
+                    shot.posX += shot.vxOverride;
+                    shot.posY += shot.vyOverride;
                 } else {
+                    shot.posY += shot.speed;
+                }
+                /* Eliminar si sale del canvas */
+                if (shot.posY > GameState.canvas.height ||
+                    shot.posX < -20 || shot.posX > GameState.canvas.width + 20) {
                     shot.deleteShot(i);
+                } else {
+                    GameState.bufferctx.drawImage(shot.image, shot.posX, shot.posY);
                 }
             } else {
                 GameState.player.killPlayer();
@@ -199,29 +209,33 @@ var game = (function () {
        ══════════════════════════════════════════════════════════ */
 
     /**
-     * Comprueba si un disparo del jugador golpea al enemigo activo.
-     * Si golpea: reduce vida o mata al enemigo y otorga puntos.
-     * @returns {boolean} true si el disparo sigue activo, false si fue eliminado
+     * Comprueba si un disparo del jugador golpea a un enemigo concreto.
+     * @returns {boolean} true si hubo colisión (disparo consumido), false si no
      */
-    function checkCollision(shot) {
-        if (!shot.isHittingEvil()) return true;
+    function checkCollision(shot, e) {
+        if (!e || e.dead) return false;
 
-        var e = GameState.evil;
+        var hit = (
+            shot.posX >= e.posX && shot.posX <= (e.posX + e.image.width) &&
+            shot.posY >= e.posY && shot.posY <= (e.posY + e.image.height)
+        );
+        if (!hit) return false;
+
         spawnImpactParticles(shot.posX, shot.posY, e instanceof FinalBoss);
 
         if (e.life > 1) {
             e.life--;
             e.hitFlash = 6;
-            Sounds.hit();           /* RP 015: sonido de impacto */
+            Sounds.hit();
         } else {
             var pts = e.pointsToKill;
             e.kill();
             GameState.player.score += pts;
             GameState.rewardMessage = { text: '+' + pts + ' pts!', x: e.posX, y: e.posY, timer: 60, alpha: 1.0 };
-            Sounds.enemyKill();     /* RP 015: sonido de enemigo eliminado */
+            Sounds.enemyKill();
         }
         shot.deleteShot(parseInt(shot.identifier));
-        return false;
+        return true;   /* colisión: disparo consumido */
     }
 
     /* RP 004: crear partículas al impactar */
@@ -251,9 +265,9 @@ var game = (function () {
      * Detecta si el cuerpo del enemigo colisiona con el cuerpo del jugador.
      * @returns {boolean}
      */
-    function isEvilHittingPlayer() {
-        var e = GameState.evil;
+    function isEvilHittingPlayer(e) {
         var p = GameState.player;
+        if (!e || e.dead) return false;
         return (
             (e.posY + e.image.height) > p.posY &&
             (p.posY + p.height) >= e.posY &&
@@ -268,78 +282,145 @@ var game = (function () {
        ENEMIGOS: CREACIÓN Y PROGRESIÓN
        ══════════════════════════════════════════════════════════ */
 
+    /* ══════════════════════════════════════════════════════════
+       ENEMIGOS: ACTUALIZACIÓN POR FRAME
+       ══════════════════════════════════════════════════════════ */
+
     /**
-     * Actualiza la posición del enemigo activo cada frame.
-     * RP 013: si sale de pantalla, penaliza al jugador.
+     * Actualiza todos los enemigos activos.
+     * RP 013: si un enemigo sale de pantalla, penaliza al jugador.
      */
-    function updateEvil() {
-        var e = GameState.evil;
+    function updateEvil(e) {
         if (e.dead) return;
         e.update();
         if (e.isOutOfScreen()) {
             GameState.player.killPlayer();
-            e.kill();
+            e.dead = true;   /* marcarlo muerto sin decrementar totalEvils */
+            onEnemyRemoved(e);
+        }
+    }
+
+    /* Llamado cuando un enemigo muere o sale de pantalla */
+    function onEnemyRemoved(e) {
+        var gs  = GameState;
+        for (var i = gs.activeEnemies.length - 1; i >= 0; i--) {
+            if (gs.activeEnemies[i] === e) {
+                gs.activeEnemies.splice(i, 1);
+                break;
+            }
+        }
+        /* Solo avanzar si el juego sigue activo */
+        if (!gs.youLoose && !gs.congratulations && gs.activeEnemies.length === 0) {
+            advanceWave();
+        }
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       SISTEMA DE NIVELES Y OLEADAS
+       ══════════════════════════════════════════════════════════ */
+
+    /**
+     * Lanza el siguiente enemigo dentro de la oleada actual.
+     * Se llama en secuencia con WAVE_ENEMY_DELAY entre cada uno.
+     */
+    function spawnNextEnemyInWave() {
+        var gs    = GameState;
+        var level = CONFIG.LEVELS[gs.currentLevelIndex];
+        var wave  = level.waves[gs.currentWaveIndex];
+
+        if (gs.enemyInWaveIndex >= wave.length) return; /* oleada completa */
+
+        var type = wave[gs.enemyInWaveIndex];
+        var e    = buildEnemy(type);
+        gs.activeEnemies.push(e);
+        gs.evil = e;   /* mantener referencia para compatibilidad */
+
+        gs.enemyInWaveIndex++;
+
+        /* Si quedan más enemigos en la oleada, programar el siguiente */
+        if (gs.enemyInWaveIndex < wave.length) {
+            gameSetTimeout(spawnNextEnemyInWave, CONFIG.WAVE_ENEMY_DELAY);
         }
     }
 
     /**
-     * Comprueba si quedan enemigos y crea el siguiente,
-     * o activa la victoria si era el último.
+     * Avanza a la siguiente oleada o nivel cuando activeEnemies queda vacío.
      */
-    function verifyToCreateNewEvil() {
-        if (GameState.totalEvils > 0) {
+    function advanceWave() {
+        var gs    = GameState;
+        var level = CONFIG.LEVELS[gs.currentLevelIndex];
+
+        gs.currentWaveIndex++;
+
+        if (gs.currentWaveIndex < level.waves.length) {
+            /* Siguiente oleada del mismo nivel */
             gameSetTimeout(function () {
-                GameState.evilCounter++;
-                GameState.difficultyMultiplier = 1.0 + (GameState.evilCounter - 1) * CONFIG.DIFFICULTY_STEP;
-                createNewEvil();
-            }, getRandomNumber(3000));
+                gs.enemyInWaveIndex = 0;
+                spawnNextEnemyInWave();
+            }, CONFIG.WAVE_PAUSE);
+
         } else {
-            /* RP 012: victoria */
-            gameSetTimeout(function () {
-                Sounds.victory();       /* RP 015 */
-                Scores.saveFinalScore();
-                GameState.congratulations = true;
-            }, 2000);
-        }
-    }
-
-    /**
-     * Instancia el enemigo apropiado según el nivel actual.
-     * RP 020: 3 tipos de enemigos + jefe final.
-     */
-    function createNewEvil() {
-        var gs = GameState;
-        var e;
-
-        if (gs.totalEvils === 1) {
-            /* Último enemigo siempre es el jefe final */
-            e = new FinalBoss();
-        } else {
-            var vida     = CONFIG.EVIL_LIFE  + gs.evilCounter - 1;
-            var disparos = CONFIG.EVIL_SHOTS + gs.evilCounter - 1;
-            var type;
-
-            /* Los dos primeros enemigos son normales para que el jugador aprenda */
-            if (gs.evilCounter <= 2) {
-                type = 'normal';
-            } else {
-                var rand = getRandomNumber(10);
-                type = (rand < 4) ? 'normal' : (rand < 7) ? 'fast' : 'zigzag';
+            /* Todas las oleadas del nivel completadas */
+            var bonus = level.bonusPoints;
+            if (bonus > 0) {
+                gs.player.score += bonus;
+                gs.rewardMessage = {
+                    text : 'NIVEL ' + level.id + ' COMPLETADO! +' + bonus + ' pts',
+                    x    : gs.canvas.width / 2 - 160,
+                    y    : gs.canvas.height / 2,
+                    timer: 90, alpha: 1.0
+                };
             }
 
-            if      (type === 'fast')   e = new EvilFast(vida, disparos);
-            else if (type === 'zigzag') e = new EvilZigzag(vida, disparos);
-            else                        e = new Evil(vida, disparos);
+            gs.currentLevelIndex++;
+
+            if (gs.currentLevelIndex < CONFIG.LEVELS.length) {
+                /* Mostrar pantalla de transición de nivel */
+                gs.showingLevelScreen = true;
+                gameSetTimeout(function () {
+                    gs.showingLevelScreen = false;
+                    gs.currentWaveIndex   = 0;
+                    gs.enemyInWaveIndex   = 0;
+                    gs.difficultyMultiplier = 1.0 + gs.currentLevelIndex * CONFIG.DIFFICULTY_STEP;
+                    spawnNextEnemyInWave();
+                }, CONFIG.LEVEL_PAUSE);
+            } else {
+                /* Todos los niveles superados: victoria */
+                gameSetTimeout(function () {
+                    Sounds.victory();
+                    Scores.saveFinalScore();
+                    gs.congratulations = true;
+                }, 2000);
+            }
         }
+    }
 
-        gs.evil = e;
+    /**
+     * Construye un enemigo según el tipo indicado.
+     * @param {string} type  'normal' | 'fast' | 'zigzag' | 'boss'
+     */
+    function buildEnemy(type) {
+        var gs      = GameState;
+        var vida    = CONFIG.EVIL_LIFE  + gs.currentLevelIndex;
+        var disparos= CONFIG.EVIL_SHOTS + gs.currentLevelIndex;
+        var e;
 
-        /* RP 017: guardar snapshot para poder reiniciar el nivel */
-        gs.currentEvilSnapshot = {
-            type    : e.type,
-            vida    : e.maxLife,
-            disparos: e.shots
+        if      (type === 'boss')   e = new FinalBoss();
+        else if (type === 'fast')   e = new EvilFast(vida, disparos);
+        else if (type === 'zigzag') e = new EvilZigzag(vida, disparos);
+        else                        e = new Evil(vida, disparos);
+
+        /* Sobreescribir kill() para usar onEnemyRemoved en vez de totalEvils */
+        var origKill = e.kill.bind(e);
+        e.kill = function () {
+            origKill();
+            onEnemyRemoved(e);
         };
+
+        /* Snapshot para reiniciar nivel (RP 017) */
+        gs.currentEvilSnapshot = { type: type, vida: vida, disparos: disparos };
+
+        return e;
     }
 
     /* ══════════════════════════════════════════════════════════
@@ -350,15 +431,15 @@ var game = (function () {
         clearAllTimeouts();
         var gs = GameState;
 
-        /* RP 014: aplicar dificultad — diferencias notables entre niveles */
+        /* RP 014: aplicar dificultad */
         var diffMods = [
-            { speedMod: 0.45, shotMod: 0.4, bossLife: 6,  bossShots: 15, diffStep: 0.08, shotDelay: 350 },  /* Fácil */
-            { speedMod: 1.0,  shotMod: 1.0, bossLife: 12, bossShots: 30, diffStep: 0.15, shotDelay: 250 },  /* Normal */
-            { speedMod: 1.8,  shotMod: 1.8, bossLife: 18, bossShots: 50, diffStep: 0.25, shotDelay: 200 }   /* Difícil */
+            { speedMod: 0.45, shotMod: 0.4, bossLife: 6,  bossShots: 15, diffStep: 0.08, shotDelay: 350 },
+            { speedMod: 1.0,  shotMod: 1.0, bossLife: 12, bossShots: 30, diffStep: 0.15, shotDelay: 250 },
+            { speedMod: 1.8,  shotMod: 1.8, bossLife: 18, bossShots: 50, diffStep: 0.25, shotDelay: 200 }
         ];
         var mod = diffMods[gs.selectedDifficulty || 1];
         CONFIG.EVIL_SPEED      = 1   * mod.speedMod;
-        CONFIG.EVIL_SHOTS      = Math.round(5  * mod.shotMod);
+        CONFIG.EVIL_SHOTS      = Math.round(5 * mod.shotMod);
         CONFIG.BOSS_LIFE       = mod.bossLife;
         CONFIG.BOSS_SHOTS      = mod.bossShots;
         CONFIG.DIFFICULTY_STEP = mod.diffStep;
@@ -367,50 +448,60 @@ var game = (function () {
         gs.showingStartScreen  = false;
         gs.showingInstructions = false;
         gs.showingOptions      = false;
+        gs.showingLevelScreen  = false;
         gs.youLoose            = false;
         gs.congratulations     = false;
         gs.endOverlayShown     = false;
         gs.paused              = false;
-        gs.totalEvils          = CONFIG.TOTAL_EVILS;
-        gs.evilCounter         = 1;
         gs.difficultyMultiplier= 1.0;
         gs.playerShotsBuffer   = [];
         gs.evilShotsBuffer     = [];
+        gs.activeEnemies       = [];
         gs.rewardMessage       = null;
         gs.impactParticles     = [];
         gs.nextPlayerShot      = 0;
 
+        /* Índices de progresión */
+        gs.currentLevelIndex = 0;
+        gs.currentWaveIndex  = 0;
+        gs.enemyInWaveIndex  = 0;
+
         gs.player = new Player(CONFIG.PLAYER_LIFE, 0);
-        createNewEvil();
+
+        /* Mostrar pantalla del primer nivel brevemente antes de empezar */
+        gs.showingLevelScreen = true;
+        gameSetTimeout(function () {
+            gs.showingLevelScreen = false;
+            spawnNextEnemyInWave();
+        }, CONFIG.LEVEL_PAUSE);
+
         updatePauseButton(false);
         hideEndOverlay();
     }
 
-    /** Reinicia solo el nivel actual (mismo enemigo). RP 017 */
+    /** Reinicia el nivel actual (RP 017) */
     function restartCurrentLevel() {
         var snap = GameState.currentEvilSnapshot;
         if (!snap) return;
 
         clearAllTimeouts();
         var gs = GameState;
-        gs.youLoose        = false;
-        gs.congratulations = false;
-        gs.endOverlayShown = false;
-        gs.paused          = false;
-        gs.rewardMessage   = null;
+        gs.youLoose           = false;
+        gs.congratulations    = false;
+        gs.endOverlayShown    = false;
+        gs.paused             = false;
+        gs.showingLevelScreen = false;
+        gs.rewardMessage      = null;
+        gs.activeEnemies      = [];
         gs.evilShotsBuffer.splice(0, gs.evilShotsBuffer.length);
         gs.playerShotsBuffer.splice(0, gs.playerShotsBuffer.length);
 
-        /* Conservar puntuación; reiniciar con 1 vida */
         gs.player = new Player(1, gs.player.score);
 
-        /* Recrear el mismo enemigo con los parámetros originales */
-        var e;
-        if      (snap.type === 'boss')   e = new FinalBoss();
-        else if (snap.type === 'fast')   e = new EvilFast(snap.vida, snap.disparos);
-        else if (snap.type === 'zigzag') e = new EvilZigzag(snap.vida, snap.disparos);
-        else                             e = new Evil(snap.vida, snap.disparos);
-        gs.evil = e;
+        /* Reiniciar desde la primera oleada del nivel actual */
+        gs.currentWaveIndex = 0;
+        gs.enemyInWaveIndex = 0;
+        spawnNextEnemyInWave();
 
         updatePauseButton(false);
         hideEndOverlay();
@@ -732,9 +823,7 @@ var game = (function () {
        ══════════════════════════════════════════════════════════ */
 
     /* Exponer verifyToCreateNewEvil y createNewEvil para que entities.js los use */
-    window.verifyToCreateNewEvil = verifyToCreateNewEvil;
-    window.createNewEvil         = createNewEvil;
-    window.goToMainMenu          = goToMainMenu;
+    window.goToMainMenu = goToMainMenu;
 
     return { init: init };
 
