@@ -8,11 +8,12 @@
 
 var Renderer = (function () {
 
-    /* ── Fondo ─────────────────────────────────────────────────────────── */
+    /* ── Fondo — usa el nivel actual para elegir imagen ────────────────── */
     function drawBackground() {
         var gs  = GameState;
-        if (!gs.evil) return;
-        var bg = (gs.evil instanceof FinalBoss) ? gs.images.bgBoss : gs.images.bgMain;
+        var level = CONFIG.LEVELS[gs.currentLevelIndex];
+        var isBossLevel = level && level.waves[0] && level.waves[0][0] === 'boss';
+        var bg = isBossLevel ? gs.images.bgBoss : gs.images.bgMain;
         gs.bufferctx.drawImage(bg, 0, 0);
     }
 
@@ -61,6 +62,22 @@ var Renderer = (function () {
 
         /* RP 029: indicador de tipo de enemigo */
         drawEvilTypeIndicator(theme);
+
+        /* Número de nivel en esquina inferior derecha */
+        var level = CONFIG.LEVELS[gs.currentLevelIndex];
+        if (level) {
+            ctx.fillStyle   = 'rgba(0,0,0,0.55)';
+            ctx.strokeStyle = theme.accent;
+            ctx.lineWidth   = 1;
+            roundRect(ctx, cw - 100, gs.canvas.height - 26, 96, 20, 4);
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = theme.title;
+            ctx.font      = 'bold 11px Arial';
+            ctx.textAlign = 'right';
+            ctx.fillText(level.label.toUpperCase(), cw - 8, gs.canvas.height - 11);
+            ctx.textAlign = 'left';
+        }
     }
 
     /* ── RP 029: indicador visual del tipo de enemigo activo ────────────── */
@@ -658,6 +675,74 @@ var Renderer = (function () {
         ctx.textAlign = 'left';
     }
 
+    /* ── Pantalla de transición entre niveles ───────────────────────────── */
+    function drawLevelScreen() {
+        var gs    = GameState;
+        var ctx   = gs.bufferctx;
+        var cw    = gs.canvas.width;
+        var ch    = gs.canvas.height;
+        var level = CONFIG.LEVELS[gs.currentLevelIndex];
+        var theme = getThemeColors();
+
+        /* Fondo con degradado del tema */
+        var grad = ctx.createLinearGradient(0, 0, 0, ch);
+        grad.addColorStop(0, 'rgba(0,0,0,0.92)');
+        grad.addColorStop(1, 'rgba(0,0,0,0.75)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, cw, ch);
+
+        ctx.textAlign = 'center';
+
+        /* Número de nivel grande */
+        ctx.fillStyle = theme.title;
+        ctx.font      = 'bold 56px Arial';
+        ctx.fillText(level.label.toUpperCase(), cw / 2, ch / 2 - 40);
+
+        /* Línea decorativa */
+        ctx.strokeStyle = theme.accent;
+        ctx.lineWidth   = 2;
+        ctx.beginPath();
+        ctx.moveTo(cw / 2 - 160, ch / 2 - 20);
+        ctx.lineTo(cw / 2 + 160, ch / 2 - 20);
+        ctx.stroke();
+
+        /* Descripción de la oleada */
+        var waveDesc = [];
+        for (var w = 0; w < level.waves.length; w++) {
+            var waveTypes = level.waves[w];
+            var counts = {};
+            for (var t = 0; t < waveTypes.length; t++) {
+                counts[waveTypes[t]] = (counts[waveTypes[t]] || 0) + 1;
+            }
+            var parts = [];
+            if (counts['normal']) parts.push(counts['normal'] + ' normal' + (counts['normal'] > 1 ? 'es' : ''));
+            if (counts['fast'])   parts.push(counts['fast']   + ' r\u00e1pido' + (counts['fast'] > 1 ? 's' : ''));
+            if (counts['zigzag']) parts.push(counts['zigzag'] + ' zigzag');
+            if (counts['boss'])   parts.push('\u26a0 JEFE FINAL');
+            waveDesc.push('Oleada ' + (w + 1) + ': ' + parts.join(' + '));
+        }
+        ctx.fillStyle = '#ccc';
+        ctx.font      = '15px Arial';
+        for (var i = 0; i < waveDesc.length; i++) {
+            ctx.fillText(waveDesc[i], cw / 2, ch / 2 + 18 + i * 26);
+        }
+
+        /* Bonus del nivel */
+        if (level.bonusPoints > 0) {
+            ctx.fillStyle = theme.title;
+            ctx.font      = 'bold 14px Arial';
+            ctx.fillText('Bonus al completar: +' + level.bonusPoints + ' pts', cw / 2, ch / 2 + 18 + waveDesc.length * 26 + 20);
+        }
+
+        /* Indicador de progreso: puntos */
+        var dots = Math.floor(Date.now() / 500) % 4;
+        ctx.fillStyle = 'rgba(180,180,180,0.7)';
+        ctx.font      = '13px Arial';
+        ctx.fillText('Preparando' + '...'.slice(0, dots + 1), cw / 2, ch - 40);
+
+        ctx.textAlign = 'left';
+    }
+
     /* ── Victoria (RP 019) ──────────────────────────────────────────────── */
     function drawCongratulations() {
         var gs    = GameState;
@@ -728,6 +813,7 @@ var Renderer = (function () {
         drawStartScreen     : drawStartScreen,
         drawOptionsMenu     : drawOptionsMenu,
         drawInstructions    : drawInstructions,
+        drawLevelScreen     : drawLevelScreen,
         drawPauseScreen     : drawPauseScreen,
         drawGameOver        : drawGameOver,
         drawCongratulations : drawCongratulations,
