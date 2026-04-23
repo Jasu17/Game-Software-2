@@ -10,7 +10,7 @@ var CONFIG = {
     PLAYER_LIFE      : 3,
     PLAYER_SPEED     : 5,
     SHOT_SPEED       : 5,
-    SHOT_DELAY_MS    : 250,   // RP 018/028: mínimo ms entre disparos del jugador
+    SHOT_DELAY_MS    : 250,
 
     /* Enemigos base */
     EVIL_SPEED       : 1,
@@ -23,7 +23,7 @@ var CONFIG = {
     BOSS_SHOTS       : 30,
 
     /* Dificultad (RP 030) */
-    DIFFICULTY_STEP  : 0.15,  // +15 % de velocidad por enemigo superado
+    DIFFICULTY_STEP  : 0.15,
 
     /* Movimiento horizontal de enemigos */
     MIN_H_OFFSET     : 100,
@@ -36,7 +36,65 @@ var CONFIG = {
     KEY_LEFT  : 37,
     KEY_RIGHT : 39,
     KEY_FIRE  : 32,
-    KEY_PAUSE : 80   // P
+    KEY_PAUSE : 80,
+
+    /**
+     * Definición de niveles.
+     * Cada nivel tiene un array de oleadas; cada oleada es un array de tipos
+     * de enemigo que aparecen en sucesión rápida (WAVE_ENEMY_DELAY ms entre c/u).
+     * El último nivel contiene la oleada del jefe.
+     * bonusPoints: puntos extra otorgados al completar el nivel.
+     */
+    LEVELS : [
+        {
+            id          : 1,
+            label       : 'Nivel 1',
+            bonusPoints : 20,
+            waves       : [
+                ['normal'],
+                ['normal']
+            ]
+        },
+        {
+            id          : 2,
+            label       : 'Nivel 2',
+            bonusPoints : 35,
+            waves       : [
+                ['normal', 'fast']
+            ]
+        },
+        {
+            id          : 3,
+            label       : 'Nivel 3',
+            bonusPoints : 50,
+            waves       : [
+                ['fast', 'zigzag']
+            ]
+        },
+        {
+            id          : 4,
+            label       : 'Nivel 4',
+            bonusPoints : 70,
+            waves       : [
+                ['zigzag', 'zigzag']
+            ]
+        },
+        {
+            id          : 5,
+            label       : 'Jefe Final',
+            bonusPoints : 0,
+            waves       : [
+                ['boss']
+            ]
+        }
+    ],
+
+    /* ms entre la aparición de cada enemigo dentro de una misma oleada */
+    WAVE_ENEMY_DELAY  : 1400,
+    /* ms de pausa entre oleadas del mismo nivel */
+    WAVE_PAUSE        : 3000,
+    /* ms de pausa entre niveles (durante la pantalla de transición) */
+    LEVEL_PAUSE       : 2200
 };
 
 /* ─── Estado global del juego ──────────────────────────────────────────────── */
@@ -71,7 +129,14 @@ var GameState = {
     /* Contadores y progresión */
     evilCounter          : 1,
     totalEvils           : CONFIG.TOTAL_EVILS,
-    difficultyMultiplier : 1.0,   // RP 030
+    difficultyMultiplier : 1.0,
+
+    /* Progresión por niveles y oleadas */
+    currentLevelIndex : 0,   // índice en CONFIG.LEVELS
+    currentWaveIndex  : 0,   // índice de oleada dentro del nivel actual
+    enemyInWaveIndex  : 0,   // índice del enemigo dentro de la oleada actual
+    activeEnemies     : [],  // enemigos vivos simultáneamente en pantalla
+    showingLevelScreen: false, // pantalla de transición entre niveles
 
     /* Flags de estado de pantalla */
     showingStartScreen  : true,   // RP 022: pantalla de inicio
